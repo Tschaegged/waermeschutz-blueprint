@@ -1,367 +1,370 @@
 blueprint:
   name: Vorausschauender Hitzeschutz (Rollladen/Jalousie)
   source_url: https://github.com/Tschaegged/waermeschutz-blueprint/blob/main/blueprints/automation/waermeschutz_rollladen.yaml
-  description: >
-    # 🌡️ Vorausschauender Hitzeschutz
-
-
-    Verschattet die Rollläden bzw. Jalousien **einer Fassade** automatisch, **bevor**
-    sich die Räume aufheizen – gesteuert über die **Tages-Temperaturvorhersage** und
-    den **Sonnenstand**. Das Blueprint wird **pro Fassade einmal** angelegt und steuert
-    alle ausgewählten Verschattungen dieser Seite gemeinsam. Über das Azimut-Fenster
-    verschattet jede Fassade genau dann, wenn die Sonne sie trifft. So schließt sich
-    nicht das ganze Haus gleichzeitig, sondern gestaffelt dem Sonnenlauf folgend
-    (Ost morgens, Süd mittags, West nachmittags). Sobald die Sonne die Fassade verlässt
-    oder es wieder kühl genug ist, fahren die Verschattungen von selbst zurück.
-
-
-    **Verschattet wird nur, wenn ALLE Bedingungen erfüllt sind:**
-
-    - vorhergesagtes Tagesmaximum ≥ Schwelle (vorausschauend)
-
-    - aktuelle Außentemperatur ≥ Schwelle (kein Verschatten an noch kühlen Hitzetagen)
-
-    - Sonne im Azimut-Fenster der Fassade
-
-    - Sonne über der Mindesthöhe (Elevation)
-
-    - optional: Außen-Helligkeit/Einstrahlung über Schwelle (bei Bewölkung wird nicht verschattet)
-
-    - innerhalb des Aktiv-Zeitfensters
-
-
-    Pro Rollladen wird automatisch erkannt, ob er **Position** und/oder
-    **Lamellen-/Kippwinkel** unterstützt – eine Fassade darf also Rollläden und
-    Jalousien mischen.
-
-
-    💡 **Tipp:** Raum-interne Lux-Sensoren (z.B. von Bewegungsmeldern) eignen sich
-    **nicht** als Bedingung – sobald verschattet ist, messen sie kein Sonnenlicht mehr.
-    Nutze stattdessen einen **Außen**-Solar-/Einstrahlungssensor.
+  description: "# \U0001F321️ Vorausschauender Hitzeschutz\n\nVerschattet die Rollläden
+    bzw. Jalousien **einer Fassade** automatisch, **bevor** sich die Räume aufheizen
+    – gesteuert über die **Tages-Temperaturvorhersage** und den **Sonnenstand**. Das
+    Blueprint wird **pro Fassade einmal** angelegt und steuert alle ausgewählten Verschattungen
+    dieser Seite gemeinsam. Über das Azimut-Fenster verschattet jede Fassade genau
+    dann, wenn die Sonne sie trifft. So schließt sich nicht das ganze Haus gleichzeitig,
+    sondern gestaffelt dem Sonnenlauf folgend (Ost morgens, Süd mittags, West nachmittags).
+    Sobald die Sonne die Fassade verlässt oder es wieder kühl genug ist, fahren die
+    Verschattungen von selbst zurück.\n\n**Verschattet wird nur, wenn ALLE Bedingungen
+    erfüllt sind:**\n- vorhergesagtes Tagesmaximum ≥ Schwelle (vorausschauend)\n-
+    aktuelle Außentemperatur ≥ Schwelle (kein Verschatten an noch kühlen Hitzetagen)\n-
+    Sonne im Azimut-Fenster der Fassade\n- Sonne über der Mindesthöhe (Elevation)\n-
+    optional: Außen-Helligkeit/Einstrahlung über Schwelle (bei Bewölkung wird nicht
+    verschattet)\n- innerhalb des Aktiv-Zeitfensters\n\nPro Rollladen wird automatisch
+    erkannt, ob er **Position** und/oder **Lamellen-/Kippwinkel** unterstützt – eine
+    Fassade darf also Rollläden und Jalousien mischen.\n\n\U0001F4A1 **Tipp:** Raum-interne
+    Lux-Sensoren (z.B. von Bewegungsmeldern) eignen sich **nicht** als Bedingung –
+    sobald verschattet ist, messen sie kein Sonnenlicht mehr. Nutze stattdessen einen
+    **Außen**-Solar-/Einstrahlungssensor.\n"
   domain: automation
   author: Claude
   homeassistant:
-    min_version: "2024.10.0"
-
+    min_version: 2024.10.0
   input:
-
-    # ══ Immer sichtbar ════════════════════════════════════════════
     covers:
-      name: "Rollläden / Jalousien dieser Fassade"
-      description: "Alle Verschattungen einer Himmelsrichtung – sie werden gemeinsam gesteuert"
+      name: Rollläden / Jalousien dieser Fassade
+      description: Alle Verschattungen einer Himmelsrichtung – sie werden gemeinsam
+        gesteuert
       selector:
         entity:
           multiple: true
           filter:
-            - domain: cover
-
+          - domain:
+            - cover
+          reorder: false
     weather_entity:
-      name: "Wettervorhersage"
-      description: "Wetterentität für das Tagesmaximum (z.B. weather.forecast_schackit)"
+      name: Wettervorhersage
+      description: Wetterentität für das Tagesmaximum (z.B. weather.forecast_schackit)
       selector:
         entity:
           filter:
-            - domain: weather
-
+          - domain:
+            - weather
+          reorder: false
+          multiple: false
     forecast_temp_threshold:
-      name: "Vorhersage-Schwelle (Tagesmaximum)"
-      description: "Hitzeschutz wird aktiv, wenn das vorhergesagte Tagesmaximum diesen Wert erreicht"
+      name: Vorhersage-Schwelle (Tagesmaximum)
+      description: Hitzeschutz wird aktiv, wenn das vorhergesagte Tagesmaximum diesen
+        Wert erreicht
       default: 26
       selector:
         number:
-          min: 15
-          max: 40
-          step: 1
-          unit_of_measurement: "°C"
+          min: 15.0
+          max: 40.0
+          step: 1.0
+          unit_of_measurement: °C
           mode: slider
-
     azimuth_start:
-      name: "Azimut Beginn (Sonnenfenster der Fassade)"
-      description: >
-        Kompassrichtung (0°=Nord, 90°=Ost, 180°=Süd, 270°=West), ab der die Sonne
-        diese Fassade trifft. Beispiel Südwest-Fassade: Beginn 150°.
+      name: Azimut Beginn (Sonnenfenster der Fassade)
+      description: 'Kompassrichtung (0°=Nord, 90°=Ost, 180°=Süd, 270°=West), ab der
+        die Sonne diese Fassade trifft. Beispiel Südwest-Fassade: Beginn 150°.
+
+        '
       default: 90
       selector:
         number:
-          min: 0
-          max: 360
-          step: 5
-          unit_of_measurement: "°"
+          min: 0.0
+          max: 360.0
+          step: 5.0
+          unit_of_measurement: °
           mode: slider
-
     azimuth_end:
-      name: "Azimut Ende (Sonnenfenster der Fassade)"
-      description: >
-        Kompassrichtung, bis zu der die Sonne diese Fassade trifft. Beispiel
+      name: Azimut Ende (Sonnenfenster der Fassade)
+      description: 'Kompassrichtung, bis zu der die Sonne diese Fassade trifft. Beispiel
         Südwest-Fassade: Ende 270°. (Werte über Nord, z.B. 300°→60°, werden unterstützt.)
+
+        '
       default: 270
       selector:
         number:
-          min: 0
-          max: 360
-          step: 5
-          unit_of_measurement: "°"
+          min: 0.0
+          max: 360.0
+          step: 5.0
+          unit_of_measurement: °
           mode: slider
-
     action_mode:
-      name: "Steuerungsart"
-      description: >
-        Position (Höhe), Lamellen-/Kippwinkel (Tilt) oder beides. Pro Rollladen wird
-        zusätzlich automatisch geprüft, ob die jeweilige Funktion unterstützt wird.
+      name: Steuerungsart
+      description: 'Position (Höhe), Lamellen-/Kippwinkel (Tilt) oder beides. Pro
+        Rollladen wird zusätzlich automatisch geprüft, ob die jeweilige Funktion unterstützt
+        wird.
+
+        '
       default: position
       selector:
         select:
           options:
-            - label: "Position (Höhe)"
-              value: position
-            - label: "Lamellen-/Kippwinkel (Tilt)"
-              value: tilt
-            - label: "Beides (Position + Tilt)"
-              value: both
-
+          - label: Position (Höhe)
+            value: position
+          - label: Lamellen-/Kippwinkel (Tilt)
+            value: tilt
+          - label: Beides (Position + Tilt)
+            value: both
+          sort: false
+          custom_value: false
+          multiple: false
     shading_position:
-      name: "Verschattungs-Position"
-      description: "Position beim Verschatten (0 = geschlossen, 100 = offen)"
+      name: Verschattungs-Position
+      description: Position beim Verschatten (0 = geschlossen, 100 = offen)
       default: 25
       selector:
         number:
-          min: 0
-          max: 100
-          step: 5
-          unit_of_measurement: "%"
+          min: 0.0
+          max: 100.0
+          step: 5.0
+          unit_of_measurement: '%'
           mode: slider
-
     shading_tilt_position:
-      name: "Verschattungs-Kippwinkel"
-      description: "Lamellenwinkel beim Verschatten (0 = zu, 100 = offen). Nur bei Steuerungsart Tilt/Beides."
+      name: Verschattungs-Kippwinkel
+      description: Lamellenwinkel beim Verschatten (0 = zu, 100 = offen). Nur bei
+        Steuerungsart Tilt/Beides.
       default: 30
       selector:
         number:
-          min: 0
-          max: 100
-          step: 5
-          unit_of_measurement: "%"
+          min: 0.0
+          max: 100.0
+          step: 5.0
+          unit_of_measurement: '%'
           mode: slider
-
     open_position:
-      name: "Offen-Position (Rückfahrt)"
-      description: "Position, auf die zurückgefahren wird, wenn kein Hitzeschutz mehr nötig ist"
+      name: Offen-Position (Rückfahrt)
+      description: Position, auf die zurückgefahren wird, wenn kein Hitzeschutz mehr
+        nötig ist
       default: 100
       selector:
         number:
-          min: 0
-          max: 100
-          step: 5
-          unit_of_measurement: "%"
+          min: 0.0
+          max: 100.0
+          step: 5.0
+          unit_of_measurement: '%'
           mode: slider
-
     open_tilt_position:
-      name: "Offen-Kippwinkel (Rückfahrt)"
-      description: "Lamellenwinkel beim Zurückfahren. Nur bei Steuerungsart Tilt/Beides."
+      name: Offen-Kippwinkel (Rückfahrt)
+      description: Lamellenwinkel beim Zurückfahren. Nur bei Steuerungsart Tilt/Beides.
       default: 100
       selector:
         number:
-          min: 0
-          max: 100
-          step: 5
-          unit_of_measurement: "%"
+          min: 0.0
+          max: 100.0
+          step: 5.0
+          unit_of_measurement: '%'
           mode: slider
-
-    # ══ Echtzeit-Bedingungen (eingeklappt) ════════════════════════
     realtime_section:
-      name: "Echtzeit-Bedingungen"
-      description: "Zusätzlich zur Tagesvorhersage – verhindern Verschatten bei kühlem Wetter, tiefer Sonne oder Bewölkung"
+      name: Echtzeit-Bedingungen
+      description: Zusätzlich zur Tagesvorhersage – verhindern Verschatten bei kühlem
+        Wetter, tiefer Sonne oder Bewölkung
       icon: mdi:weather-sunny-alert
       collapsed: true
       input:
         outdoor_temp_sensor:
-          name: "Außentemperatur-Sensor"
-          description: "Aktuelle Außentemperatur (z.B. sensor.wetterstation_outdoor_temperature)"
+          name: Außentemperatur-Sensor
+          description: Aktuelle Außentemperatur (z.B. sensor.wetterstation_outdoor_temperature)
           selector:
             entity:
               filter:
-                - domain: sensor
-                  device_class: temperature
-
+              - domain:
+                - sensor
+                device_class:
+                - temperature
+              reorder: false
+              multiple: false
         outdoor_temp_threshold:
-          name: "Außentemperatur-Schwelle"
-          description: "Verschatten erst, wenn es auch aktuell mindestens so warm ist"
+          name: Außentemperatur-Schwelle
+          description: Verschatten erst, wenn es auch aktuell mindestens so warm ist
           default: 22
           selector:
             number:
-              min: 10
-              max: 35
-              step: 1
-              unit_of_measurement: "°C"
+              min: 10.0
+              max: 35.0
+              step: 1.0
+              unit_of_measurement: °C
               mode: slider
-
         elevation_min:
-          name: "Mindest-Sonnenhöhe (Elevation)"
-          description: "Kein Verschatten, wenn die Sonne tiefer als dieser Winkel steht (Morgen/Abend)"
+          name: Mindest-Sonnenhöhe (Elevation)
+          description: Kein Verschatten, wenn die Sonne tiefer als dieser Winkel steht
+            (Morgen/Abend)
           default: 12
           selector:
             number:
-              min: 0
-              max: 60
-              step: 1
-              unit_of_measurement: "°"
+              min: 0.0
+              max: 60.0
+              step: 1.0
+              unit_of_measurement: °
               mode: slider
-
         solar_sensor:
-          name: "Außen-Helligkeit / Einstrahlung (optional)"
-          description: >
-            Außensensor für Solar-Lux oder Einstrahlung (z.B. sensor.wetterstation_solar_lux).
-            Leer lassen, um diese Bedingung zu deaktivieren. Bitte KEINEN Raum-Luxsensor verwenden.
-          default: ""
+          name: Außen-Helligkeit / Einstrahlung (optional)
+          description: 'Außensensor für Solar-Lux oder Einstrahlung (z.B. sensor.wetterstation_solar_lux).
+            Leer lassen, um diese Bedingung zu deaktivieren. Bitte KEINEN Raum-Luxsensor
+            verwenden.
+
+            '
+          default: ''
           selector:
             entity:
               filter:
-                - domain: sensor
-
+              - domain:
+                - sensor
+              reorder: false
+              multiple: false
         solar_threshold:
-          name: "Helligkeits-/Einstrahlungs-Schwelle"
-          description: "Verschatten erst ab diesem Wert (Einheit je nach Sensor, z.B. Lux oder W/m²). Schützt vor Verschatten bei Bewölkung."
+          name: Helligkeits-/Einstrahlungs-Schwelle
+          description: Verschatten erst ab diesem Wert (Einheit je nach Sensor, z.B.
+            Lux oder W/m²). Schützt vor Verschatten bei Bewölkung.
           default: 30000
           selector:
             number:
-              min: 0
-              max: 120000
-              step: 1000
+              min: 0.0
+              max: 120000.0
+              step: 1000.0
               mode: box
-
         sun_entity:
-          name: "Sonnen-Entität"
-          description: "Liefert Azimut und Elevation. Standard: sun.sun (muss aktiviert sein)."
+          name: Sonnen-Entität
+          description: 'Liefert Azimut und Elevation. Standard: sun.sun (muss aktiviert
+            sein).'
           default: sun.sun
           selector:
             entity:
               filter:
-                - domain: sun
-
-    # ══ Zusätzliche Bedingungen (eingeklappt) ═════════════════════
+              - domain:
+                - sun
+              reorder: false
+              multiple: false
     extra_conditions_section:
-      name: "Zusätzliche Bedingungen"
-      description: "Eigene Bedingungen, die zum Verschatten zusätzlich erfüllt sein müssen (z.B. Fenster geschlossen, kein Urlaubsmodus)"
+      name: Zusätzliche Bedingungen
+      description: Eigene Bedingungen, die zum Verschatten zusätzlich erfüllt sein
+        müssen (z.B. Fenster geschlossen, kein Urlaubsmodus)
       icon: mdi:filter-check-outline
       collapsed: true
       input:
         additional_conditions:
-          name: "Zusätzliche Bedingungen"
-          description: "Werden UND-verknüpft. Gelten nur für das Verschatten – die Rückfahrt erfolgt unabhängig davon."
+          name: Zusätzliche Bedingungen
+          description: Werden UND-verknüpft. Gelten nur für das Verschatten – die
+            Rückfahrt erfolgt unabhängig davon.
           default: []
           selector:
             condition: {}
-
-    # ══ Erweitert (eingeklappt) ═══════════════════════════════════
     advanced_section:
-      name: "Erweitert"
-      description: "Rückfahrt-Verhalten, Zeitfenster, Schonung, Anwesenheit, Status-Helfer, Benachrichtigung"
+      name: Erweitert
+      description: Rückfahrt-Verhalten, Zeitfenster, Schonung, Anwesenheit, Status-Helfer,
+        Benachrichtigung
       icon: mdi:tune
       collapsed: true
       input:
         reopen_tilt_only:
-          name: "Rückfahrt nur Kippwinkel (je Jalousie)"
-          description: >
-            Für die hier ausgewählten Jalousien wird bei der Rückfahrt NUR der Kippwinkel
-            geöffnet – die Position (Höhe) bleibt unverändert. Praktisch, wenn eine Jalousie
-            unten bleiben, aber wieder durchsichtig werden soll. Nicht ausgewählte
-            Verschattungen fahren Position und/oder Kippwinkel zurück (wie unter Steuerungsart).
+          name: Rückfahrt nur Kippwinkel (je Jalousie)
+          description: 'Für die hier ausgewählten Jalousien wird bei der Rückfahrt
+            NUR der Kippwinkel geöffnet – die Position (Höhe) bleibt unverändert.
+            Praktisch, wenn eine Jalousie unten bleiben, aber wieder durchsichtig
+            werden soll. Nicht ausgewählte Verschattungen fahren Position und/oder
+            Kippwinkel zurück (wie unter Steuerungsart).
+
+            '
           default: []
           selector:
             entity:
               multiple: true
               filter:
-                - domain: cover
-
+              - domain:
+                - cover
+              reorder: false
         time_start:
-          name: "Aktiv ab"
-          description: "Vor dieser Uhrzeit wird nicht verschattet"
-          default: "08:00:00"
+          name: Aktiv ab
+          description: Vor dieser Uhrzeit wird nicht verschattet
+          default: 08:00:00
           selector:
             time: {}
-
         time_end:
-          name: "Aktiv bis"
-          description: "Nach dieser Uhrzeit wird nicht mehr verschattet (Rückfahrt bleibt möglich)"
-          default: "21:00:00"
+          name: Aktiv bis
+          description: Nach dieser Uhrzeit wird nicht mehr verschattet (Rückfahrt
+            bleibt möglich)
+          default: '21:00:00'
           selector:
             time: {}
-
         cooldown:
-          name: "Mindestpause zwischen Fahrten (Minuten)"
-          description: "Schont Motor/Batterie und verhindert schnelles Hin-und-Her (je Rollladen)"
+          name: Mindestpause zwischen Fahrten (Minuten)
+          description: Schont Motor/Batterie und verhindert schnelles Hin-und-Her
+            (je Rollladen)
           default: 10
           selector:
             number:
-              min: 0
-              max: 60
-              step: 1
+              min: 0.0
+              max: 60.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
-
         position_tolerance:
-          name: "Positionstoleranz"
-          description: >
-            Ein Rollladen wird nur gefahren, wenn seine aktuelle Position mehr als diesen
-            Wert vom Ziel abweicht. Verhindert Mikro-Fahrten und respektiert kleine manuelle Eingriffe.
+          name: Positionstoleranz
+          description: 'Ein Rollladen wird nur gefahren, wenn seine aktuelle Position
+            mehr als diesen Wert vom Ziel abweicht. Verhindert Mikro-Fahrten und respektiert
+            kleine manuelle Eingriffe.
+
+            '
           default: 8
           selector:
             number:
-              min: 0
-              max: 50
-              step: 1
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 50.0
+              step: 1.0
+              unit_of_measurement: '%'
               mode: slider
-
         presence_entity:
-          name: "Anwesenheits-Entität (optional)"
-          description: "Bei Anwesenheit (on/home) wird milder verschattet, um Resthelligkeit zu lassen"
-          default: ""
+          name: Anwesenheits-Entität (optional)
+          description: Bei Anwesenheit (on/home) wird milder verschattet, um Resthelligkeit
+            zu lassen
+          default: ''
           selector:
             entity:
               filter:
-                - domain: binary_sensor
-                - domain: input_boolean
-                - domain: person
-
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              - domain:
+                - person
+              reorder: false
+              multiple: false
         presence_shading_position:
-          name: "Verschattungs-Position bei Anwesenheit"
-          description: "Mildere (höhere) Position, wenn jemand im Raum/anwesend ist"
+          name: Verschattungs-Position bei Anwesenheit
+          description: Mildere (höhere) Position, wenn jemand im Raum/anwesend ist
           default: 45
           selector:
             number:
-              min: 0
-              max: 100
-              step: 5
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 100.0
+              step: 5.0
+              unit_of_measurement: '%'
               mode: slider
-
         state_helper:
-          name: "Status-Helfer (optional input_boolean)"
-          description: >
-            Merkt sich, dass DIESE Automation verschattet hat. Dann wird nur zurückgefahren,
-            wenn die Automation selbst geschlossen hat – manuelle Eingriffe bleiben unangetastet.
-          default: ""
+          name: Status-Helfer (optional input_boolean)
+          description: 'Merkt sich, dass DIESE Automation verschattet hat. Dann wird
+            nur zurückgefahren, wenn die Automation selbst geschlossen hat – manuelle
+            Eingriffe bleiben unangetastet.
+
+            '
+          default: ''
           selector:
             entity:
               filter:
-                - domain: input_boolean
-
+              - domain:
+                - input_boolean
+              reorder: false
+              multiple: false
         notify_devices:
-          name: "Benachrichtigungsgeräte (optional)"
-          description: "Push bei Verschatten/Zurückfahren. Leer lassen für keine Benachrichtigung."
+          name: Benachrichtigungsgeräte (optional)
+          description: Push bei Verschatten/Zurückfahren. Leer lassen für keine Benachrichtigung.
           default: []
           selector:
             device:
               integration: mobile_app
               multiple: true
-
         notify_enabled:
-          name: "Benachrichtigungen senden"
+          name: Benachrichtigungen senden
           default: false
           selector:
             boolean: {}
-
 variables:
   covers: !input covers
   weather_entity: !input weather_entity
@@ -389,166 +392,160 @@ variables:
   state_helper: !input state_helper
   notify_devices: !input notify_devices
   notify_enabled: !input notify_enabled
-
 triggers:
-  - trigger: time_pattern
-    minutes: "/5"
-  - trigger: homeassistant
-    event: start
-  - trigger: state
-    entity_id: !input sun_entity
-  - trigger: numeric_state
-    entity_id: !input outdoor_temp_sensor
-    above: !input outdoor_temp_threshold
-
+- trigger: time_pattern
+  minutes: /5
+- trigger: homeassistant
+  event: start
+- trigger: state
+  entity_id: !input sun_entity
+- trigger: numeric_state
+  entity_id: !input outdoor_temp_sensor
+  above: !input outdoor_temp_threshold
 conditions: []
-
 actions:
+- action: weather.get_forecasts
+  data:
+    type: daily
+  target:
+    entity_id: '{{ weather_entity }}'
+  response_variable: forecast_response
+- variables:
+    forecast_max: "{{ forecast_response[weather_entity]['forecast'][0].temperature
+      | float(-99)\n   if forecast_response.get(weather_entity, {}).get('forecast')
+      else -99 }}\n"
+    cur_outdoor: '{{ states(outdoor_temp_sensor) | float(-99) }}'
+    az: '{{ state_attr(sun_entity, ''azimuth'') | float(-1) }}'
+    el: '{{ state_attr(sun_entity, ''elevation'') | float(-90) }}'
+    solar_val: '{{ states(solar_sensor) | float(0) if solar_sensor not in ['''', none]
+      else 0 }}'
+    in_azimuth: '{% set s = azimuth_start | float %} {% set e = azimuth_end | float
+      %} {% if s <= e %}{{ s <= az <= e }}{% else %}{{ az >= s or az <= e }}{% endif
+      %}
 
-  # ── 1. Tagesvorhersage abrufen ───────────────────────────────
-  - action: weather.get_forecasts
-    data:
-      type: daily
-    target:
-      entity_id: "{{ weather_entity }}"
-    response_variable: forecast_response
-
-  # ── 2. Lage bewerten ─────────────────────────────────────────
-  - variables:
-      forecast_max: >
-        {{ forecast_response[weather_entity]['forecast'][0].temperature | float(-99)
-           if forecast_response.get(weather_entity, {}).get('forecast') else -99 }}
-      cur_outdoor: "{{ states(outdoor_temp_sensor) | float(-99) }}"
-      az: "{{ state_attr(sun_entity, 'azimuth') | float(-1) }}"
-      el: "{{ state_attr(sun_entity, 'elevation') | float(-90) }}"
-      solar_val: "{{ states(solar_sensor) | float(0) if solar_sensor not in ['', none] else 0 }}"
-      in_azimuth: >
-        {% set s = azimuth_start | float %}
-        {% set e = azimuth_end | float %}
-        {% if s <= e %}{{ s <= az <= e }}{% else %}{{ az >= s or az <= e }}{% endif %}
-      in_time: "{{ today_at(time_start) <= now() <= today_at(time_end) }}"
-      present: >
-        {{ presence_entity not in ['', none]
-           and states(presence_entity) in ['on', 'home', 'true', 'True'] }}
-      helper_active: "{{ state_helper in ['', none] or is_state(state_helper, 'on') }}"
-      target_pos: "{{ (presence_shading_position if present else shading_position) | int }}"
-      target_tilt: "{{ shading_tilt_position | int }}"
-      should_shade: >
-        {{ forecast_max >= forecast_temp_threshold | float
-           and cur_outdoor >= outdoor_temp_threshold | float
-           and in_azimuth
-           and el >= elevation_min | float
-           and (solar_sensor in ['', none] or solar_val >= solar_threshold | float)
-           and in_time }}
-
-  # ── 3. Verschatten oder Zurückfahren (je Rollladen) ──────────
-  - choose:
-
-      # — Verschatten —
-      - conditions:
-          - "{{ should_shade }}"
-          - condition: and
-            conditions: !input additional_conditions
+      '
+    in_time: '{{ today_at(time_start) <= now() <= today_at(time_end) }}'
+    present: "{{ presence_entity not in ['', none]\n   and states(presence_entity)
+      in ['on', 'home', 'true', 'True'] }}\n"
+    helper_active: '{{ state_helper in ['''', none] or is_state(state_helper, ''on'')
+      }}'
+    target_pos: '{{ (presence_shading_position if present else shading_position) |
+      int }}'
+    target_tilt: '{{ shading_tilt_position | int }}'
+    should_shade: "{{ forecast_max >= forecast_temp_threshold | float\n   and cur_outdoor
+      >= outdoor_temp_threshold | float\n   and in_azimuth\n   and el >= elevation_min
+      | float\n   and (solar_sensor in ['', none] or solar_val >= solar_threshold
+      | float)\n   and in_time }}\n"
+    just_shaded: '{{ state_helper not in ['''', none] and is_state(state_helper, ''off'')
+      }}'
+    just_opened: '{{ state_helper not in ['''', none] and is_state(state_helper, ''on'')
+      }}'
+    sun_left_facade: '{{ not (in_azimuth | bool(false)) or el < elevation_min | float
+      }}'
+- choose:
+  - conditions:
+    - '{{ should_shade }}'
+    - condition: and
+      conditions: !input additional_conditions
+    sequence:
+    - repeat:
+        for_each: '{{ covers }}'
         sequence:
-          - repeat:
-              for_each: "{{ covers }}"
-              sequence:
-                - variables:
-                    feat: "{{ state_attr(repeat.item, 'supported_features') | int(0) }}"
-                    c_pos: "{{ state_attr(repeat.item, 'current_position') | int(-1) }}"
-                    c_tilt: "{{ state_attr(repeat.item, 'current_tilt_position') | int(-1) }}"
-                    c_cooldown_ok: >
-                      {{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed, 0))
-                         > (cooldown | int * 60) }}
-                - if:
-                    - "{{ c_cooldown_ok and action_mode in ['position', 'both']
-                          and (feat | bitwise_and(4))
-                          and (c_pos < 0 or (c_pos - target_pos) | abs > position_tolerance | int) }}"
-                  then:
-                    - action: cover.set_cover_position
-                      target:
-                        entity_id: "{{ repeat.item }}"
-                      data:
-                        position: "{{ target_pos }}"
-                - if:
-                    - "{{ c_cooldown_ok and action_mode in ['tilt', 'both']
-                          and (feat | bitwise_and(128))
-                          and (c_tilt < 0 or (c_tilt - target_tilt) | abs > position_tolerance | int) }}"
-                  then:
-                    - action: cover.set_cover_tilt_position
-                      target:
-                        entity_id: "{{ repeat.item }}"
-                      data:
-                        tilt_position: "{{ target_tilt }}"
-          - if:
-              - "{{ state_helper not in ['', none] }}"
-            then:
-              - action: input_boolean.turn_on
-                target:
-                  entity_id: "{{ state_helper }}"
-          - if:
-              - "{{ notify_enabled and notify_devices | count > 0 }}"
-            then:
-              - action: notify.send_message
-                target:
-                  device_id: !input notify_devices
-                data:
-                  title: "🌡️ Hitzeschutz aktiv"
-                  message: >
-                    {{ covers | count }} Verschattung(en) verschattet
-                    (Vorhersage {{ forecast_max | round(0) }}°C, außen {{ cur_outdoor | round(1) }}°C).
+        - variables:
+            feat: '{{ state_attr(repeat.item, ''supported_features'') | int(0) }}'
+            c_pos: '{{ state_attr(repeat.item, ''current_position'') | int(-1) }}'
+            c_tilt: '{{ state_attr(repeat.item, ''current_tilt_position'') | int(-1)
+              }}'
+            c_cooldown_ok: "{{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed,
+              0))\n   > (cooldown | int * 60) }}\n"
+        - if:
+          - '{{ c_cooldown_ok and action_mode in [''position'', ''both''] and (feat
+            | bitwise_and(4)) and (c_pos < 0 or (c_pos - target_pos) | abs > position_tolerance
+            | int) }}'
+          then:
+          - action: cover.set_cover_position
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              position: '{{ target_pos }}'
+        - if:
+          - '{{ c_cooldown_ok and action_mode in [''tilt'', ''both''] and (feat |
+            bitwise_and(128)) and (c_tilt < 0 or (c_tilt - target_tilt) | abs > position_tolerance
+            | int) }}'
+          then:
+          - action: cover.set_cover_tilt_position
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              tilt_position: '{{ target_tilt }}'
+    - if:
+      - '{{ state_helper not in ['''', none] }}'
+      then:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: '{{ state_helper }}'
+    - if:
+      - '{{ notify_enabled and notify_devices | count > 0 and (state_helper in ['''',
+        none] or just_shaded) }}'
+      then:
+      - action: notify.send_message
+        target:
+          device_id: !input notify_devices
+        data:
+          title: "\U0001F321️ Hitzeschutz aktiv"
+          message: '{{ covers | count }} Verschattung(en) verschattet (Vorhersage
+            {{ forecast_max | round(0) }}°C, außen {{ cur_outdoor | round(1) }}°C).
 
-      # — Zurückfahren —
-      - conditions:
-          - "{{ not should_shade and helper_active }}"
+            '
+  - conditions:
+    - '{{ sun_left_facade and helper_active }}'
+    sequence:
+    - repeat:
+        for_each: '{{ covers }}'
         sequence:
-          - repeat:
-              for_each: "{{ covers }}"
-              sequence:
-                - variables:
-                    feat: "{{ state_attr(repeat.item, 'supported_features') | int(0) }}"
-                    c_pos: "{{ state_attr(repeat.item, 'current_position') | int(-1) }}"
-                    c_tilt: "{{ state_attr(repeat.item, 'current_tilt_position') | int(-1) }}"
-                    c_cooldown_ok: >
-                      {{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed, 0))
-                         > (cooldown | int * 60) }}
-                    tilt_only: "{{ repeat.item in reopen_tilt_only }}"
-                - if:
-                    - "{{ c_cooldown_ok and action_mode in ['position', 'both']
-                          and (feat | bitwise_and(4)) and not tilt_only
-                          and (c_pos < 0 or (c_pos - (open_position | int)) | abs > position_tolerance | int) }}"
-                  then:
-                    - action: cover.set_cover_position
-                      target:
-                        entity_id: "{{ repeat.item }}"
-                      data:
-                        position: "{{ open_position | int }}"
-                - if:
-                    - "{{ c_cooldown_ok and action_mode in ['tilt', 'both']
-                          and (feat | bitwise_and(128))
-                          and (c_tilt < 0 or (c_tilt - (open_tilt_position | int)) | abs > position_tolerance | int) }}"
-                  then:
-                    - action: cover.set_cover_tilt_position
-                      target:
-                        entity_id: "{{ repeat.item }}"
-                      data:
-                        tilt_position: "{{ open_tilt_position | int }}"
-          - if:
-              - "{{ state_helper not in ['', none] }}"
-            then:
-              - action: input_boolean.turn_off
-                target:
-                  entity_id: "{{ state_helper }}"
-          - if:
-              - "{{ notify_enabled and notify_devices | count > 0
-                    and (state_helper not in ['', none]) }}"
-            then:
-              - action: notify.send_message
-                target:
-                  device_id: !input notify_devices
-                data:
-                  title: "🌤️ Hitzeschutz beendet"
-                  message: "{{ covers | count }} Verschattung(en) wieder geöffnet."
-
+        - variables:
+            feat: '{{ state_attr(repeat.item, ''supported_features'') | int(0) }}'
+            c_pos: '{{ state_attr(repeat.item, ''current_position'') | int(-1) }}'
+            c_tilt: '{{ state_attr(repeat.item, ''current_tilt_position'') | int(-1)
+              }}'
+            c_cooldown_ok: "{{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed,
+              0))\n   > (cooldown | int * 60) }}\n"
+            tilt_only: '{{ repeat.item in reopen_tilt_only }}'
+        - if:
+          - '{{ c_cooldown_ok and action_mode in [''position'', ''both''] and (feat
+            | bitwise_and(4)) and not tilt_only and (c_pos < 0 or (c_pos - (open_position
+            | int)) | abs > position_tolerance | int) }}'
+          then:
+          - action: cover.set_cover_position
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              position: '{{ open_position | int }}'
+        - if:
+          - '{{ c_cooldown_ok and action_mode in [''tilt'', ''both''] and (feat |
+            bitwise_and(128)) and (c_tilt < 0 or (c_tilt - (open_tilt_position | int))
+            | abs > position_tolerance | int) }}'
+          then:
+          - action: cover.set_cover_tilt_position
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              tilt_position: '{{ open_tilt_position | int }}'
+    - if:
+      - '{{ state_helper not in ['''', none] }}'
+      then:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: '{{ state_helper }}'
+    - if:
+      - '{{ notify_enabled and notify_devices | count > 0 and (state_helper in ['''',
+        none] or just_opened) }}'
+      then:
+      - action: notify.send_message
+        target:
+          device_id: !input notify_devices
+        data:
+          title: "\U0001F324️ Hitzeschutz beendet"
+          message: '{{ covers | count }} Verschattung(en) wieder geöffnet.'
 mode: restart
 max_exceeded: silent
