@@ -16,10 +16,12 @@ blueprint:
     optional: Außen-Helligkeit/Einstrahlung über Schwelle (bei Bewölkung wird nicht
     verschattet)\n- innerhalb des Aktiv-Zeitfensters\n\nPro Rollladen wird automatisch
     erkannt, ob er **Position** und/oder **Lamellen-/Kippwinkel** unterstützt – eine
-    Fassade darf also Rollläden und Jalousien mischen.\n\n\U0001F4A1 **Tipp:** Raum-interne
-    Lux-Sensoren (z.B. von Bewegungsmeldern) eignen sich **nicht** als Bedingung –
-    sobald verschattet ist, messen sie kein Sonnenlicht mehr. Nutze stattdessen einen
-    **Außen**-Solar-/Einstrahlungssensor.\n"
+    Fassade darf also Rollläden und Jalousien mischen.\n\n**Manueller Eingriff:** Wird
+    ein Rollladen manuell bewegt (App, Schalter, Taste), überspringt die Automation
+    ihn für den Rest des Tages – sofern der optionale Manuell-Speicher eingerichtet
+    ist.\n\n\U0001F4A1 **Tipp:** Raum-interne Lux-Sensoren (z.B. von Bewegungsmeldern)
+    eignen sich **nicht** als Bedingung – sobald verschattet ist, messen sie kein Sonnenlicht
+    mehr. Nutze stattdessen einen **Außen**-Solar-/Einstrahlungssensor.\n"
   domain: automation
   author: Claude
   homeassistant:
@@ -211,8 +213,11 @@ blueprint:
               multiple: false
         solar_threshold:
           name: Helligkeits-/Einstrahlungs-Schwelle
-          description: Verschatten erst ab diesem Wert (Einheit je nach Sensor, z.B.
-            Lux oder W/m²). Schützt vor Verschatten bei Bewölkung.
+          description: "Verschatten erst ab diesem Wert. Einheit je nach gewähltem\
+            \ Sensor:\n• Solar-Lux (lx): ~20.000 leichte Bewölkung · ~50.000 Schleierwolken\
+            \ · ~80.000+ klarer Himmel\n• Einstrahlung (W/m²): ~150 leichte Bewölkung\
+            \ · ~300 Schleierwolken · ~600+ klarer Himmel\nRichtwert: ca. 50 % des\
+            \ Maximalwerts deines Sensors."
           default: 30000
           selector:
             number:
@@ -249,7 +254,7 @@ blueprint:
     advanced_section:
       name: Erweitert
       description: Rückfahrt-Verhalten, Zeitfenster, Schonung, Anwesenheit, Status-Helfer,
-        Benachrichtigung
+        Manuell-Speicher, Benachrichtigung
       icon: mdi:tune
       collapsed: true
       input:
@@ -352,6 +357,22 @@ blueprint:
                 - input_boolean
               reorder: false
               multiple: false
+        position_memory_helper:
+          name: Manuell-Speicher (optional input_text)
+          description: "Speichert, auf welche Positionen diese Automation verschattet\
+            \ hat. Bewegt jemand einen Rollladen manuell (App, Schalter, Fernbedienung),\
+            \ überspringt die Automation ihn für den Rest des Tages. Automatisches\
+            \ Zurücksetzen um Mitternacht.\n\nEinrichten: Einstellungen → Geräte &\
+            \ Dienste → Helfer → Helfer erstellen → Text. Name z.B. \"Hitzeschutz\
+            \ Speicher West\". Pro Automation einen eigenen Helfer verwenden."
+          default: ''
+          selector:
+            entity:
+              filter:
+              - domain:
+                - input_text
+              reorder: false
+              multiple: false
         notify_devices:
           name: Benachrichtigungsgeräte (optional)
           description: Push bei Verschatten/Zurückfahren. Leer lassen für keine Benachrichtigung.
@@ -390,6 +411,7 @@ variables:
   presence_entity: !input presence_entity
   presence_shading_position: !input presence_shading_position
   state_helper: !input state_helper
+  position_memory_helper: !input position_memory_helper
   notify_devices: !input notify_devices
   notify_enabled: !input notify_enabled
 triggers:
@@ -402,8 +424,45 @@ triggers:
 - trigger: numeric_state
   entity_id: !input outdoor_temp_sensor
   above: !input outdoor_temp_threshold
+- trigger: time
+  at: '00:00:00'
+  id: midnight_reset
+- trigger: state
+  entity_id: !input covers
+  attribute: current_position
+  id: cover_manually_moved
+- trigger: state
+  entity_id: !input covers
+  attribute: current_tilt_position
+  id: cover_manually_moved
 conditions: []
 actions:
+- if:
+  - '{{ trigger.id == ''midnight_reset'' }}'
+  then:
+  - if:
+    - '{{ position_memory_helper not in ['''', none] }}'
+    then:
+    - action: input_text.set_value
+      target:
+        entity_id: '{{ position_memory_helper }}'
+      data:
+        value: '{}'
+  - stop: Tages-Speicher zurückgesetzt
+- if:
+  - '{{ trigger.id == ''cover_manually_moved'' }}'
+  then:
+  - if:
+    - '{{ trigger.to_state.context.parent_id is none and position_memory_helper not
+      in ['''', none] }}'
+    then:
+    - action: input_text.set_value
+      target:
+        entity_id: '{{ position_memory_helper }}'
+      data:
+        value: "{{ ((states(position_memory_helper) or '{}') | from_json | default({})\
+          \ | combine({trigger.entity_id: -1})) | to_json }}"
+  - stop: Manueller Eingriff gespeichert
 - action: weather.get_forecasts
   data:
     type: daily
@@ -458,20 +517,45 @@ actions:
               }}'
             c_cooldown_ok: "{{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed,
               0))\n   > (cooldown | int * 60) }}\n"
+        - variables:
+            _mem: "{{ (states(position_memory_helper) or '{}') | from_json | default({}) }}"
+            stored_pos: '{{ _mem.get(repeat.item, -99) | int(-99) }}'
+            is_overridden: '{{ stored_pos == -1 }}'
+            manually_moved: '{{ not is_overridden and stored_pos >= 0 and (c_pos -
+              stored_pos) | abs > position_tolerance | int }}'
+            skip_today: '{{ is_overridden or manually_moved }}'
         - if:
-          - '{{ c_cooldown_ok and action_mode in [''position'', ''both''] and (feat
-            | bitwise_and(4)) and (c_pos < 0 or (c_pos - target_pos) | abs > position_tolerance
-            | int) }}'
+          - '{{ position_memory_helper not in ['''', none] and manually_moved }}'
+          then:
+          - action: input_text.set_value
+            target:
+              entity_id: '{{ position_memory_helper }}'
+            data:
+              value: "{{ ((states(position_memory_helper) or '{}') | from_json | default({})\
+                \ | combine({repeat.item: -1})) | to_json }}"
+        - if:
+          - '{{ not skip_today and c_cooldown_ok and action_mode in [''position'',
+            ''both''] and (feat | bitwise_and(4)) and (c_pos < 0 or (c_pos - target_pos)
+            | abs > position_tolerance | int) }}'
           then:
           - action: cover.set_cover_position
             target:
               entity_id: '{{ repeat.item }}'
             data:
               position: '{{ target_pos }}'
+          - if:
+            - '{{ position_memory_helper not in ['''', none] }}'
+            then:
+            - action: input_text.set_value
+              target:
+                entity_id: '{{ position_memory_helper }}'
+              data:
+                value: "{{ ((states(position_memory_helper) or '{}') | from_json |\
+                  \ default({}) | combine({repeat.item: target_pos})) | to_json }}"
         - if:
-          - '{{ c_cooldown_ok and action_mode in [''tilt'', ''both''] and (feat |
-            bitwise_and(128)) and (c_tilt < 0 or (c_tilt - target_tilt) | abs > position_tolerance
-            | int) }}'
+          - '{{ not skip_today and c_cooldown_ok and action_mode in [''tilt'', ''both'']
+            and (feat | bitwise_and(128)) and (c_tilt < 0 or (c_tilt - target_tilt)
+            | abs > position_tolerance | int) }}'
           then:
           - action: cover.set_cover_tilt_position
             target:
@@ -511,26 +595,58 @@ actions:
             c_cooldown_ok: "{{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed,
               0))\n   > (cooldown | int * 60) }}\n"
             tilt_only: '{{ repeat.item in reopen_tilt_only }}'
+        - variables:
+            _mem: "{{ (states(position_memory_helper) or '{}') | from_json | default({}) }}"
+            stored_pos: '{{ _mem.get(repeat.item, -99) | int(-99) }}'
+            skip_today: '{{ stored_pos == -1 }}'
         - if:
-          - '{{ c_cooldown_ok and action_mode in [''position'', ''both''] and (feat
-            | bitwise_and(4)) and not tilt_only and (c_pos < 0 or (c_pos - (open_position
-            | int)) | abs > position_tolerance | int) }}'
+          - '{{ not skip_today and c_cooldown_ok and action_mode in [''position'',
+            ''both''] and (feat | bitwise_and(4)) and not tilt_only and (c_pos < 0
+            or (c_pos - (open_position | int)) | abs > position_tolerance | int) }}'
           then:
           - action: cover.set_cover_position
             target:
               entity_id: '{{ repeat.item }}'
             data:
               position: '{{ open_position | int }}'
+          - if:
+            - '{{ position_memory_helper not in ['''', none] }}'
+            then:
+            - action: input_text.set_value
+              target:
+                entity_id: '{{ position_memory_helper }}'
+              data:
+                value: >
+                  {% set raw = states(position_memory_helper) %}
+                  {% set d = (raw or '{}') | from_json | default({}) %}
+                  {% set ns = namespace(nd={}) %}
+                  {% for k, v in d.items() if k != repeat.item %}{% set ns.nd = ns.nd
+                  | combine({k: v}) %}{% endfor %}
+                  {{ ns.nd | to_json }}
         - if:
-          - '{{ c_cooldown_ok and action_mode in [''tilt'', ''both''] and (feat |
-            bitwise_and(128)) and (c_tilt < 0 or (c_tilt - (open_tilt_position | int))
-            | abs > position_tolerance | int) }}'
+          - '{{ not skip_today and c_cooldown_ok and action_mode in [''tilt'', ''both'']
+            and (feat | bitwise_and(128)) and (c_tilt < 0 or (c_tilt - (open_tilt_position
+            | int)) | abs > position_tolerance | int) }}'
           then:
           - action: cover.set_cover_tilt_position
             target:
               entity_id: '{{ repeat.item }}'
             data:
               tilt_position: '{{ open_tilt_position | int }}'
+          - if:
+            - '{{ position_memory_helper not in ['''', none] }}'
+            then:
+            - action: input_text.set_value
+              target:
+                entity_id: '{{ position_memory_helper }}'
+              data:
+                value: >
+                  {% set raw = states(position_memory_helper) %}
+                  {% set d = (raw or '{}') | from_json | default({}) %}
+                  {% set ns = namespace(nd={}) %}
+                  {% for k, v in d.items() if k != repeat.item %}{% set ns.nd = ns.nd
+                  | combine({k: v}) %}{% endfor %}
+                  {{ ns.nd | to_json }}
     - if:
       - '{{ state_helper not in ['''', none] }}'
       then:
