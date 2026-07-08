@@ -464,8 +464,8 @@ actions:
       target:
         entity_id: '{{ position_memory_helper }}'
       data:
-        value: "{{ ((states(position_memory_helper) or '{}') | from_json | default({})\
-          \ | combine({trigger.entity_id: -1})) | to_json }}"
+        value: "{{ (states(position_memory_helper) | from_json({}) | combine({trigger.entity_id:\
+          \ -1})) | to_json }}"
   - stop: Manueller Eingriff gespeichert
 - action: weather.get_forecasts
   data:
@@ -522,7 +522,7 @@ actions:
             c_cooldown_ok: "{{ (as_timestamp(now()) - as_timestamp(states[repeat.item].last_changed,
               0))\n   > (cooldown | int * 60) }}\n"
         - variables:
-            _mem: "{{ (states(position_memory_helper) or '{}') | from_json | default({}) }}"
+            _mem: "{{ states(position_memory_helper) | from_json({}) }}"
             stored_pos: '{{ _mem.get(repeat.item, -99) | int(-99) }}'
             is_overridden: '{{ stored_pos == -1 }}'
             manually_moved: '{{ not is_overridden and stored_pos >= 0 and (c_pos -
@@ -535,8 +535,8 @@ actions:
             target:
               entity_id: '{{ position_memory_helper }}'
             data:
-              value: "{{ ((states(position_memory_helper) or '{}') | from_json | default({})\
-                \ | combine({repeat.item: -1})) | to_json }}"
+              value: "{{ (states(position_memory_helper) | from_json({}) | combine({repeat.item:\
+                \ -1})) | to_json }}"
         - if:
           - '{{ not skip_today and c_cooldown_ok and action_mode in [''position'',
             ''both''] and (feat | bitwise_and(4)) and (c_pos < 0 or (c_pos - target_pos)
@@ -554,8 +554,8 @@ actions:
               target:
                 entity_id: '{{ position_memory_helper }}'
               data:
-                value: "{{ ((states(position_memory_helper) or '{}') | from_json |\
-                  \ default({}) | combine({repeat.item: target_pos})) | to_json }}"
+                value: "{{ (states(position_memory_helper) | from_json({}) | combine({repeat.item:\
+                  \ target_pos})) | to_json }}"
         - if:
           - '{{ not skip_today and c_cooldown_ok and action_mode in [''tilt'', ''both'']
             and (feat | bitwise_and(128)) and (c_tilt < 0 or (c_tilt - target_tilt)
@@ -600,7 +600,7 @@ actions:
               0))\n   > (cooldown | int * 60) }}\n"
             tilt_only: '{{ repeat.item in reopen_tilt_only }}'
         - variables:
-            _mem: "{{ (states(position_memory_helper) or '{}') | from_json | default({}) }}"
+            _mem: "{{ states(position_memory_helper) | from_json({}) }}"
             stored_pos: '{{ _mem.get(repeat.item, -99) | int(-99) }}'
             skip_today: '{{ stored_pos == -1 }}'
         - if:
@@ -622,7 +622,7 @@ actions:
               data:
                 value: >
                   {% set raw = states(position_memory_helper) %}
-                  {% set d = (raw or '{}') | from_json | default({}) %}
+                  {% set d = raw | from_json({}) %}
                   {% set ns = namespace(nd={}) %}
                   {% for k, v in d.items() if k != repeat.item %}{% set ns.nd = ns.nd
                   | combine({k: v}) %}{% endfor %}
@@ -646,7 +646,7 @@ actions:
               data:
                 value: >
                   {% set raw = states(position_memory_helper) %}
-                  {% set d = (raw or '{}') | from_json | default({}) %}
+                  {% set d = raw | from_json({}) %}
                   {% set ns = namespace(nd={}) %}
                   {% for k, v in d.items() if k != repeat.item %}{% set ns.nd = ns.nd
                   | combine({k: v}) %}{% endfor %}
