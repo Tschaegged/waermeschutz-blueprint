@@ -431,10 +431,14 @@ triggers:
   entity_id: !input covers
   attribute: current_position
   id: cover_manually_moved
+  for:
+    minutes: 2
 - trigger: state
   entity_id: !input covers
   attribute: current_tilt_position
   id: cover_manually_moved
+  for:
+    minutes: 2
 conditions: []
 actions:
 - if:
